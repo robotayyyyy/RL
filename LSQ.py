@@ -429,7 +429,7 @@ n = len(s4)
 for i in range(n):    
     reward4.append(s4[i].reward)
 
-#
+
 # allPolicyWeight,m1,d1 = loadExp("reward 0 1") 
 # allPolicyWeight,m2,d2 = loadExp("reward -1 1") 
 # allPolicyWeight,m3,d3 = loadExp("reward -1 fx1") 
