@@ -163,7 +163,10 @@ def renderPolicy(policyWeight):
         action = policyFunction(policyWeight, state)
         #action = int(np.round( random.random())) #pure random policy
         nextState, reward, isAbsorb, info = env.step(action) #do action
-         
+        
+        if reward == 1:
+            reward = rawardFunction2(nextState)
+                 
         if isAbsorb: #the game end befor max timestep reached
             samples.append( mySample(state,action,reward,nextState,isAbsorb) )
             break
@@ -173,7 +176,7 @@ def renderPolicy(policyWeight):
         state = nextState
     env.close()
     print(j+1)
-    #return(samples)
+    return(samples)
 
 def LSQ(samples, policyWeight):
     A = np.matrix(np.zeros((D,D)))
@@ -273,7 +276,7 @@ def loadExp(expName):
     
     return [allPolicyWeight,allMeanTimestep,allDistance]
     
-
+maxTimeStep = 6000
 maxIteration = 200
 def LSPI():
     allPolicyWeight = []
@@ -305,11 +308,12 @@ def LSPI():
     #expName = "reward 0 1"
     #expName = "reward -1 1"
     #expName = "reward -1 fx1"
-    expName = "reward -1 fx2"
+    #expName = "reward -1 fx2"
+    expName = "reward -1 fx2 6000 TimeStep"
     saveExp(expName,allPolicyWeight,allMeanTimestep,allDistance)
     
-maxIteration = 100 #max itteration of LSPI if distance not less than predefine threshold
-distanceThreshold = 0 #threshold to judge that policy is convert
+#maxIteration = 100 #max itteration of LSPI if distance not less than predefine threshold
+#distanceThreshold = 0 #threshold to judge that policy is convert
 def LSPI2():
     allPolicyWeight = []
     allMeanTimestep = []
@@ -321,7 +325,7 @@ def LSPI2():
     distance = np.math.inf
     
     iteration = 0
-    samples = collectSamples(b2)
+    samples = collectSamples(b1) + collectSamples(b1) + collectSamples(b1) + collectSamples(b1) + collectSamples(b2)
     
     while iteration < maxIteration and distance > distanceThreshold:
         
@@ -344,13 +348,87 @@ def LSPI2():
     #expName = "init sample b1 b2 (reward -1 1)"
     
     #expName = "init sample b1 (reward -1 fx2)"
-    expName = "init sample b2 (reward -1 fx2)"
+    #expName = "init sample b2 (reward -1 fx2)"
     #expName = "init sample b1 b2 (reward -1 fx2)"
+    expName = "init sample b1 b1 b1 b1 b2 (reward -1 fx2)"
     
     saveExp(expName,allPolicyWeight,allMeanTimestep,allDistance)
     
     
 #allPolicyWeight,allMeanTimestep,allDistance = loadExp(expName) #for load option
+
+
+
+
+# expList = ["init sample b1 (reward -1 1)"]
+# expList.append("init sample b2 (reward -1 1)")
+# expList.append("init sample b1 b2 (reward -1 1)")
+# 
+# expList = ["init sample b1 (reward -1 fx2)"]
+# # expList.append("init sample b1 (reward -1 fx2)")
+# expList.append("init sample b2 (reward -1 fx2)")
+# expList.append("init sample b1 b2 (reward -1 fx2)")
+
+# expList = ["reward 0 1"]
+# expList.append("reward -1 1")
+# expList.append("reward -1 fx1")
+# expList.append("reward -1 fx2")
+
+expList = ["reward -1 fx2 6000 TimeStep"]
+expList.append("reward -1 fx2")
+
+
+plt.close()
+
+plt.figure( figsize=(20, 9))
+plt.ylim(0,6100)
+for expName in expList:
+    allPolicyWeight2,meanTimeStep,distance = loadExp(expName) 
+    plt.plot(meanTimeStep,label=expName,linewidth = 2 )#,linestyle = "dashed")#,color = "red")
+plt.title("Experiment 3 and 2",loc = "center")
+plt.grid('on')
+
+lgd = plt.legend(bbox_to_anchor=(0.5,-.1), loc=9, borderaxespad=.1,ncol = 3)
+for line in lgd.get_lines():
+    line.set_linewidth(3)
+plt.savefig(rootDir+'exp3and2.png',additional_artists = lgd,bbox_inches='tight')
+
+plt.show()
+
+
+policyWeight = allPolicyWeight[110]
+s1 = renderPolicy(policyWeight)
+
+policyWeight = allPolicyWeight[160]
+s2 = renderPolicy(policyWeight)
+
+reward = []
+reward2 = []
+n = len(s1)
+for i in range(n):
+    reward.append(s1[i].reward)
+    
+n = len(s2)
+for i in range(n):    
+    reward2.append(s2[i].reward)
+    
+    
+policyWeight = allPolicyWeight[90]
+s3 = renderPolicy(policyWeight)
+
+policyWeight = allPolicyWeight2[90]
+s4 = renderPolicy(policyWeight)
+
+reward3 = []
+reward4 = []
+n = len(s3)
+for i in range(n):
+    reward3.append(s3[i].reward)
+    
+n = len(s4)
+for i in range(n):    
+    reward4.append(s4[i].reward)
+
 
 # allPolicyWeight,m1,d1 = loadExp("reward 0 1") 
 # allPolicyWeight,m2,d2 = loadExp("reward -1 1") 
