@@ -134,7 +134,7 @@ def rawardFunction2(nextState):
     
 def collectSamples(policyWeight):
     samples = []
-
+    sumreward = []
     for i in range(maxEpisode):
         state = env.reset() #reset simulation to start position
         for j in range(maxTimeStep):
@@ -144,6 +144,8 @@ def collectSamples(policyWeight):
             
             if reward == 1:
                 reward = rawardFunction2(nextState)
+            # if reward == 1:
+            #     reward = 0
                 
             if isAbsorb: #the game end befor max timestep reached
                 reward = -1 # 0 or -1
@@ -152,8 +154,9 @@ def collectSamples(policyWeight):
 
             #record
             samples.append( mySample(state,action,reward,nextState,isAbsorb) )
+            sumreward.append(reward)
             state = nextState
-    return(samples)
+    return(  {'samples':samples,'avgReward':np.average(sumreward)}  )
 
 def renderPolicy(policyWeight):
     samples = []
@@ -229,7 +232,7 @@ def loadFile(filename):
     with open (filename, 'rb') as fp:
         return(pickle.load(fp))
 
-def saveExp(expName,allPolicyWeight,allMeanTimestep,allDistance):
+def saveExp(expName,allPolicyWeight,allMeanTimestep,allDistance,allMeanReward):
     outputDir = rootDir+expName+"\\"
     if not os.path.exists(outputDir):
         os.makedirs(outputDir)
@@ -249,6 +252,7 @@ def saveExp(expName,allPolicyWeight,allMeanTimestep,allDistance):
     saveFile(outputDir+"allMeanTimestep",allMeanTimestep)
     saveFile(outputDir+"allDistance",allDistance)
     saveFile(outputDir+"desc",desc)
+    saveFile(outputDir+"allMeanReward",allMeanReward)
     
     plt.plot(allMeanTimestep,label=expName,color = "red")
     plt.ylabel('timestep per EP')
@@ -264,6 +268,13 @@ def saveExp(expName,allPolicyWeight,allMeanTimestep,allDistance):
     plt.savefig(outputDir+"Distance.png")
     plt.close()
     
+    plt.plot(allMeanReward,label=expName,color = "red")
+    plt.ylabel('MeanReward per iteration')
+    plt.xlabel('iteration')
+    plt.legend(bbox_to_anchor=(0.7, 1.1), loc=2, borderaxespad=0.)
+    plt.savefig(outputDir+"MeanReward.png")
+    plt.close()
+    
 def loadExp(expName):
     outputDir = rootDir+expName+"\\"
     if not os.path.exists(outputDir):
@@ -273,8 +284,9 @@ def loadExp(expName):
     allPolicyWeight = loadFile(rootDir+expName+"\\allPolicyWeight")
     allMeanTimestep = loadFile(rootDir+expName+"\\allMeanTimestep")
     allDistance = loadFile(rootDir+expName+"\\allDistance")
+    allMeanReward = loadFile(rootDir+expName+"\\allMeanReward")
     
-    return [allPolicyWeight,allMeanTimestep,allDistance]
+    return [allPolicyWeight,allMeanTimestep,allDistance,allMeanReward]
     
 maxTimeStep = 6000
 maxIteration = 200
@@ -283,6 +295,7 @@ def LSPI():
     allMeanTimestep = []
     allDistance = []
     allSamples = []
+    allMeanReward = []
     
     policyWeight = np.matrix(np.zeros((D,1))) #initial policy
     allPolicyWeight.append(policyWeight)
@@ -291,7 +304,9 @@ def LSPI():
     iteration = 0
     while iteration < maxIteration and distance > distanceThreshold:
         
-        samples = collectSamples(policyWeight) #optional
+        obj = collectSamples(policyWeight) #optional
+        samples = obj['samples']
+        avgReward = obj['avgReward']
         policyWeight = LSQ(samples, policyWeight)
         distance = np.linalg.norm(policyWeight-allPolicyWeight[iteration])
         print(iteration,"average time steps :",len(samples)/maxEpisode,"distance",distance)
@@ -301,16 +316,17 @@ def LSPI():
         allPolicyWeight.append(policyWeight)
         allMeanTimestep.append(len(samples)/maxEpisode)
         allDistance.append(distance)
-        #allSamples.append(samples)
+        allMeanReward.append(avgReward)
     
-    print(policyWeight,len(collectSamples(policyWeight))/maxEpisode)
+    print(policyWeight,len(collectSamples(policyWeight)['samples'])/maxEpisode)
     
     #expName = "reward 0 1"
     #expName = "reward -1 1"
     #expName = "reward -1 fx1"
     #expName = "reward -1 fx2"
     expName = "reward -1 fx2 6000 TimeStep"
-    saveExp(expName,allPolicyWeight,allMeanTimestep,allDistance)
+    #expName = "reward -1 0"
+    saveExp(expName,allPolicyWeight,allMeanTimestep,allDistance,allMeanReward)
     
 #maxIteration = 100 #max itteration of LSPI if distance not less than predefine threshold
 #distanceThreshold = 0 #threshold to judge that policy is convert
@@ -319,17 +335,20 @@ def LSPI2():
     allMeanTimestep = []
     allDistance = []
     allSamples = []
+    allMeanReward = []
     
     policyWeight = np.matrix(np.zeros((D,1))) #initial policy
     allPolicyWeight.append(policyWeight)
     distance = np.math.inf
     
     iteration = 0
-    samples = collectSamples(b1) + collectSamples(b1) + collectSamples(b1) + collectSamples(b1) + collectSamples(b2)
+    samples = collectSamples(b1)['samples'] + collectSamples(b1)['samples'] + collectSamples(b1)['samples'] + collectSamples(b1)['samples'] + collectSamples(b2)['samples']
     
     while iteration < maxIteration and distance > distanceThreshold:
         
-        tempsamples = collectSamples(policyWeight) #optional
+        obj = collectSamples(policyWeight) #optional
+        tempsamples = obj['samples']
+        avgReward = obj['avgReward']
         policyWeight = LSQ(samples, policyWeight)
         distance = np.linalg.norm(policyWeight-allPolicyWeight[iteration])
         print(iteration,"average time steps :",len(tempsamples)/maxEpisode,"distance",distance)
@@ -339,9 +358,9 @@ def LSPI2():
         allPolicyWeight.append(policyWeight)
         allMeanTimestep.append(len(tempsamples)/maxEpisode)
         allDistance.append(distance)
-        #allSamples.append(samples)
+        allMeanReward.append(avgReward)
     
-    print(policyWeight,len(collectSamples(policyWeight))/maxEpisode)
+    print(policyWeight,len(collectSamples(policyWeight)['samples'])/maxEpisode)
     
     #expName = "init sample b1 (reward -1 1)"
     #expName = "init sample b2 (reward -1 1)"
@@ -350,15 +369,12 @@ def LSPI2():
     #expName = "init sample b1 (reward -1 fx2)"
     #expName = "init sample b2 (reward -1 fx2)"
     #expName = "init sample b1 b2 (reward -1 fx2)"
-    expName = "init sample b1 b1 b1 b1 b2 (reward -1 fx2)"
+    #expName = "init sample b1 b1 b1 b1 b2 (reward -1 fx2)"
+    expName = "test2"
+    saveExp(expName,allPolicyWeight,allMeanTimestep,allDistance,allMeanReward)
     
-    saveExp(expName,allPolicyWeight,allMeanTimestep,allDistance)
     
-    
-#allPolicyWeight,allMeanTimestep,allDistance = loadExp(expName) #for load option
-#
-
-
+#allPolicyWeight,allMeanTimestep,allDistance,allMeanReward = loadExp(expName) #for load option
 
 # expList = ["init sample b1 (reward -1 1)"]
 # expList.append("init sample b2 (reward -1 1)")
@@ -373,88 +389,58 @@ def LSPI2():
 # expList.append("reward -1 1")
 # expList.append("reward -1 fx1")
 # expList.append("reward -1 fx2")
-
-expList = ["reward -1 fx2 6000 TimeStep"]
-expList.append("reward -1 fx2")
-
-
-plt.close()
-
-plt.figure( figsize=(20, 9))
-plt.ylim(0,6100)
-for expName in expList:
-    allPolicyWeight2,meanTimeStep,distance = loadExp(expName) 
-    plt.plot(meanTimeStep,label=expName,linewidth = 2 )#,linestyle = "dashed")#,color = "red")
-plt.title("Experiment 3 and 2",loc = "center")
-plt.grid('on')
-
-lgd = plt.legend(bbox_to_anchor=(0.5,-.1), loc=9, borderaxespad=.1,ncol = 3)
-for line in lgd.get_lines():
-    line.set_linewidth(3)
-plt.savefig(rootDir+'exp3and2.png',additional_artists = lgd,bbox_inches='tight')
-
-plt.show()
-
-
-policyWeight = allPolicyWeight[110]
-s1 = renderPolicy(policyWeight)
-
-policyWeight = allPolicyWeight[160]
-s2 = renderPolicy(policyWeight)
-
-reward = []
-reward2 = []
-n = len(s1)
-for i in range(n):
-    reward.append(s1[i].reward)
-    
-n = len(s2)
-for i in range(n):    
-    reward2.append(s2[i].reward)
-    
-    
-policyWeight = allPolicyWeight[90]
-s3 = renderPolicy(policyWeight)
-
-policyWeight = allPolicyWeight2[90]
-s4 = renderPolicy(policyWeight)
-
-reward3 = []
-reward4 = []
-n = len(s3)
-for i in range(n):
-    reward3.append(s3[i].reward)
-    
-n = len(s4)
-for i in range(n):    
-    reward4.append(s4[i].reward)
-
-
-# allPolicyWeight,m1,d1 = loadExp("reward 0 1") 
-# allPolicyWeight,m2,d2 = loadExp("reward -1 1") 
-# allPolicyWeight,m3,d3 = loadExp("reward -1 fx1") 
-# allPolicyWeight,m4,d4 = loadExp("reward -1 fx2") 
-
-# for i in range(50):
-#     print(samples[i].state, policyFunction(policyWeight, samples[i].state))
- 
-# plt.plot(m1,label="reward 0 1",color = "red")
-# plt.plot(m2,label="reward -1 1",color = "blue")
-# plt.plot(m3,label="reward -1 fx1",color = "green")
-# plt.plot(m4,label="reward -1 fx2",color = "orange")
-# plt.ylabel('timestep per EP')
-# plt.xlabel('iteration')
-# plt.legend(bbox_to_anchor=(0, 1), loc=2, borderaxespad=0.)
-# #plt.show()
-# plt.savefig(rootDir+"variousReward.png")
+# 
+# expList = ["reward -1 fx2 6000 TimeStep"]
+# expList.append("reward -1 fx2")
 # 
 # 
-# plt.plot(d1,label="reward 0 1",color = "red")
-# plt.plot(d2,label="reward -1 1",color = "blue")
-# plt.plot(d3,label="reward -1 fx1",color = "green")
-# plt.plot(d4,label="reward -1 fx2",color = "orange")
-# plt.ylabel('Distance per iteration')
-# plt.xlabel('iteration')
-# plt.legend(bbox_to_anchor=(0, 1), loc=2, borderaxespad=0.)
-# #plt.show()
-# plt.savefig(rootDir+"variousDistance.png")
+# plt.close()
+# 
+# plt.figure( figsize=(20, 9))
+# plt.ylim(0,6100)
+# for expName in expList:
+#     allPolicyWeight2,meanTimeStep,distance,allMeanReward = loadExp(expName) 
+#     plt.plot(meanTimeStep,label=expName,linewidth = 2 )#,linestyle = "dashed")#,color = "red")
+# plt.title("Experiment 3 and 2",loc = "center")
+# plt.grid('on')
+# 
+# lgd = plt.legend(bbox_to_anchor=(0.5,-.1), loc=9, borderaxespad=.1,ncol = 3)
+# for line in lgd.get_lines():
+#     line.set_linewidth(3)
+# plt.savefig(rootDir+'exp3and2.png',additional_artists = lgd,bbox_inches='tight')
+# 
+# plt.show()
+# 
+# 
+# policyWeight = allPolicyWeight[110]
+# s1 = renderPolicy(policyWeight)
+# 
+# policyWeight = allPolicyWeight[160]
+# s2 = renderPolicy(policyWeight)
+# 
+# reward = []
+# reward2 = []
+# n = len(s1)
+# for i in range(n):
+#     reward.append(s1[i].reward)
+#     
+# n = len(s2)
+# for i in range(n):    
+#     reward2.append(s2[i].reward)
+#     
+#     
+# policyWeight = allPolicyWeight[90]
+# s3 = renderPolicy(policyWeight)
+# 
+# policyWeight = allPolicyWeight2[90]
+# s4 = renderPolicy(policyWeight)
+# 
+# reward3 = []
+# reward4 = []
+# n = len(s3)
+# for i in range(n):
+#     reward3.append(s3[i].reward)
+#     
+# n = len(s4)
+# for i in range(n):    
+#     reward4.append(s4[i].reward)
