@@ -1,11 +1,12 @@
 import pickle
 import os#, errno
 import gym
+#env._max_episode_steps = 50000 #new version of gym is very ugly with default _max_episode_steps, if _max_episode_steps is reach, isAbsorb is return
 import numpy as np
 import random 
 import itertools
 from collections import namedtuple
-import matplotlib.pyplot as plt
+
 random.seed(42)
 env = gym.make('CartPole-v0')
 
@@ -14,21 +15,25 @@ maxDegree = 12*2*np.math.pi/360 #max possible pole degree(radian)
 maxX = 2.4 #max distance in X axist
 possibleAction = 2 #amount of possible action
 
-c1 = [-maxX, maxX]
-c2 = [-1,  1]
-c3 = [-maxDegree,-maxDegree/2,maxDegree/2, maxDegree]
-c4 = [-1,-0.1,0.1, 1]
-D = 8 #dimension of state
-#D = (len(c1) * len(c2) * len(c3) * len(c4) +1)*2
+cX = [-maxX,0, maxX]
+cA = [-maxDegree, 0 , maxDegree]
+cAD = [-1,0, 1]
+#D = 8 #dimension of state
+D = ( len(cX) * len(cA) * len(cAD) +1 ) * 2
 
-
+relativeVectors = []
+for w in cX :
+    #for x in cXD :
+    for y in cA :
+        for z in cAD :
+            relativeVectors.append([w,y,z])
 
 #constant for algorithm
 discountFactor = 0.9 # set abitary 0 to 1
 explorationRate = 0.01
 lamda = 0.0
 
-maxTimeStep = 1000 #timestep for each EP if absorb state no found
+maxTimeStep = 6000 #timestep for each EP if absorb state no found
 maxEpisode = 100 #EP for each
 maxIteration = 200 #max itteration of LSPI if distance not less than predefine threshold
 distanceThreshold = .1 #threshold to judge that policy is convert
@@ -42,16 +47,31 @@ b2[0:int(D/2),0] = -1
 b2[int(D/2):D,0] = 1
 b1 =b2*-1
 
-relativeVectors = []
-for w in c1 :
-    for x in c2 :
-        for y in c3 :
-            for z in c4 :
-                relativeVectors.append([w,x,y,z])
+w1 = b2.copy()
+w1[1] = 0
+w1[5] = 0
 
+w2 = w1.copy()
+w2[0] = 0
+w2[4] = 0
+
+w3 = w1.copy()
+w3[3] = 0
+w3[7] = 0 
+
+w4 = w1.copy()
+w4[0] = -0.5
+w4[4] = 0.5
+
+w5 = w4.copy()
+w5[0] = -0.5
+w5[1] = 0.5
+w5[4] = 0.5
+w5[5] = -0.5
 
 #function
-def basis(state, action): #only support 4D raw state and 0,1 action
+'''
+def basis(state, action): #best
     phi = np.zeros((D,1))
     if(action == 0):
         phi[0,0]= state[0]/maxX
@@ -64,11 +84,12 @@ def basis(state, action): #only support 4D raw state and 0,1 action
         phi[6,0]= state[2]/maxDegree
         phi[7,0]= state[3]/maxDegree
     return(phi)
-
-
 '''
+
 def basis(state,action):
+    state = [state[0],state[2],state[3]]
     temp = np.zeros((D,1))
+    
     if(action == 0):
         base = 0
     else:
@@ -82,10 +103,10 @@ def basis(state,action):
     xValue = np.linalg.norm( dist, axis = 1)
     yValue = np.exp( -(xValue * xValue) )
     n=len(yValue)
-    temp[count:count + n,0] = yValue
+    temp[count:(count + n),0] = yValue
                  
     return(temp)
-'''
+
 
 def policyFunction(policyWeight, state):#get the action that maximize utility(value function) for given state
 
@@ -105,81 +126,168 @@ def policyFunction(policyWeight, state):#get the action that maximize utility(va
         
     return(selectedAction)
 
-def rawardFunction(nextState):
-    rewX = 1-np.linalg.norm(nextState[0]/maxX)
-    rewXD = 1-np.linalg.norm(nextState[1]/maxX)
-    rewA = 1-np.linalg.norm(nextState[2]/maxDegree)
-    rewAD = 1-np.linalg.norm(nextState[3])
-    reward = min(rewX ,rewA,rewAD ) 
-    #reward = min(rewX ,rewA ) 
-    #reward = (3*rewX + 0*rewXD + 3*rewA + 1*rewAD)/7 
+
+def rewardFunction01(nextState, isAbsorb):
+    
+    if isAbsorb:
+        reward = 0
+    else:
+        reward = 1
     return(reward)
 
-def rawardFunction2(nextState):
+def rewardFunctionMinus10(nextState, isAbsorb):
     
-    Angle = nextState[2]
-    AngleV = nextState[3]
+    if isAbsorb:
+        reward = -1
+    else:
+        reward = 0
+    return(reward)
+
+def rewardFunctionMinus11(nextState, isAbsorb):
     
-    if Angle <0 :
-        if AngleV <0:
-            reward = 0
-        else:
-            reward = 1
-    else :
-        if AngleV <0:
-            reward = 1
-        else:
-            reward = 0
+    if isAbsorb:
+        reward = -1
+    else:
+        reward = 1
+    return(reward)
+
+def rewardFunction1(nextState,isAbsorb):
+    
+    if isAbsorb:
+        reward = -1
+    else:
+        rewX = 1-np.linalg.norm(nextState[0]/maxX)
+        rewXD = 1-np.linalg.norm(nextState[1]/maxX)
+        rewA = 1-np.linalg.norm(nextState[2]/maxDegree)
+        #rewAD = 1-np.linalg.norm(nextState[3]/2.5)
+        rewAD = np.math.exp(-(nextState[3]*nextState[3]))
+        reward = np.min([rewX ,rewA,rewAD ])
+    return(reward)
+
+def rewardFunction1V2(nextState,isAbsorb):
+    
+
+    rewX = np.linalg.norm(nextState[0]/maxX)
+    rewXD = np.linalg.norm(nextState[1]/maxX)
+    rewA = np.linalg.norm(nextState[2]/maxDegree)
+    #rewAD = 1-np.linalg.norm(nextState[3]/2.5)
+    rewAD =  np.linalg.norm(nextState[3])
+    reward = -rewX -rewA -rewAD
     return(reward)
     
-def collectSamples(policyWeight):
+def rewardFunction2(nextState,isAbsorb):#best
+    
+    if isAbsorb:
+        reward = -1
+    else:
+        Angle = nextState[2]
+        AngleV = nextState[3]
+        
+        if Angle <0 :
+            if AngleV <0:
+                reward = 0
+            else:
+                reward = 1
+        else :
+            if AngleV <0:
+                reward = 1
+            else:
+                reward = 0
+    return(reward)
+
+def rewardFunction3(nextState,isAbsorb):
+    
+    if isAbsorb:
+        reward = -1
+    else:
+        x = np.linalg.norm(nextState[0]/maxX)/2
+        Angle = nextState[2]
+        AngleV = nextState[3]
+        
+        if Angle <0 :
+            if AngleV <0:
+                reward = 0
+            else:
+                reward = 1
+        else :
+            if AngleV <0:
+                reward = 1
+            else:
+                reward = 0
+        reward = reward-x
+    return(reward)
+
+def rewardFunction4(nextState,isAbsorb):
+    positionX = nextState[0]
+    Angle = nextState[2]
+    reward = -np.math.pow(positionX,2) -np.math.pow(Angle,8)
+    return(reward)
+
+def rewardFunction4V2(nextState,isAbsorb):
+    positionX = nextState[0]/maxX
+    Angle = nextState[2]/maxDegree
+    # positionX = nextState[0]
+    # Angle = nextState[2]
+    reward =  np.min([-np.math.pow(positionX,128), -np.math.pow(Angle,16) ]) 
+    return(reward)
+    
+def rewardFunction5(nextState,isAbsorb):
+    positionX = nextState[0]
+    Angle = nextState[2]
+    reward = -np.math.pow(Angle,2)
+    return(reward)
+    
+    
+def collectSamples(policyWeight,rewardFunction = rewardFunction2):
+    env._max_episode_steps = 50000
     samples = []
     sumreward = []
     for i in range(maxEpisode):
+
         state = env.reset() #reset simulation to start position
         for j in range(maxTimeStep):
             action = policyFunction(policyWeight, state)
-            #action = int(np.round( random.random())) #pure random policy
+            #action = int(np.round( random.random())) #pure random
             nextState, reward, isAbsorb, info = env.step(action) #do action
             
-            if reward == 1:
-                reward = rawardFunction2(nextState)
-            # if reward == 1:
-            #     reward = 0
-                
-            if isAbsorb: #the game end befor max timestep reached
-                reward = -1 # 0 or -1
-                samples.append( mySample(state,action,reward,nextState,isAbsorb) )
-                break
-
+            reward = rewardFunction(nextState,isAbsorb)
+            
             #record
             samples.append( mySample(state,action,reward,nextState,isAbsorb) )
             sumreward.append(reward)
             state = nextState
+  
+            if isAbsorb: #the game end befor max timestep reached
+                # reward = -1 # 0 or -1
+                break
+
     return(  {'samples':samples,'avgReward':np.average(sumreward)}  )
 
-def renderPolicy(policyWeight):
+def renderPolicy(policyWeight,rewardFunction = rewardFunction2):
     samples = []
+    sumreward = []
+    env._max_episode_steps = 50000
     state = env.reset() #reset simulation to start position
+    
     for j in range(maxTimeStep):
         env.render()
         action = policyFunction(policyWeight, state)
         #action = int(np.round( random.random())) #pure random policy
         nextState, reward, isAbsorb, info = env.step(action) #do action
         
-        if reward == 1:
-            reward = rawardFunction2(nextState)
-                 
-        if isAbsorb: #the game end befor max timestep reached
-            samples.append( mySample(state,action,reward,nextState,isAbsorb) )
-            break
-
+        reward = rewardFunction(nextState,isAbsorb)
+        
         #record
         samples.append( mySample(state,action,reward,nextState,isAbsorb) )
+        sumreward.append(reward)
         state = nextState
+                 
+        if isAbsorb: #the game end befor max timestep reached
+            break
+
     env.close()
     print(j+1)
-    return(samples)
+    return(  {'samples':samples,'avgReward':np.average(sumreward)}  )
 
 def LSQ(samples, policyWeight):
     A = np.matrix(np.zeros((D,D)))
@@ -215,6 +323,25 @@ def LSQLamda(samples, policyWeight,lamda):
             nextPhi = np.zeros((D,1))
         
         A = A + z * np.transpose(phi - discountFactor*nextPhi)
+        B = B + z * samples[i].reward
+    
+    return(np.linalg.pinv(A)*B)
+
+def SARSALamda(samples, policyWeight,lamda):
+    A = np.matrix(np.zeros((D,D)))
+    B = np.matrix(np.zeros((D,1)))
+    n = len(samples)
+    z = np.zeros((D,1))
+    for i in range(n-1): #start from i=0 to i=n-1
+        phi = basis(samples[i].state,samples[i].action)
+        z = (lamda)*z + phi
+        if samples[i].isAbsorb != True: #check if next state is not absorb state
+            nextAction = samples[i+1].action
+            nextPhi = basis(samples[i].nextState, nextAction)
+        else:
+            nextPhi = np.zeros((D,1))
+        
+        A = A + z * np.transpose(phi - discountFactor * nextPhi)
         B = B + z * samples[i].reward
     
     return(np.linalg.pinv(A)*B)
@@ -288,9 +415,9 @@ def loadExp(expName):
     
     return [allPolicyWeight,allMeanTimestep,allDistance,allMeanReward]
     
-maxTimeStep = 6000
-maxIteration = 200
-def LSPI():
+
+def LSPI(rewardFunction,expName,initSample = False,fix = False):
+    newSample = False
     allPolicyWeight = []
     allMeanTimestep = []
     allDistance = []
@@ -299,15 +426,51 @@ def LSPI():
     
     policyWeight = np.matrix(np.zeros((D,1))) #initial policy
     allPolicyWeight.append(policyWeight)
-    
     distance = np.math.inf
     iteration = 0
+    
+    if initSample != False:#if init sample exist
+        samples = initSample
+    else:#no init sample
+        samples = collectSamples(policyWeight,rewardFunction) 
+    while iteration < maxIteration and distance > distanceThreshold:
+        if not fix and newSample != False:#in case not fix sample and there are newSample
+            samples = newSample
+        
+        print("input---------",len(samples['samples'])/maxEpisode,"--------------")
+        policyWeight = LSQ(samples['samples'], policyWeight)
+        distance = np.linalg.norm(policyWeight-allPolicyWeight[iteration])
+        newSample = collectSamples(policyWeight,rewardFunction) #for measure performance
+        print(iteration,"average time steps :",len(newSample['samples'])/maxEpisode,"distance",distance)
+        iteration +=1
+        
+        #record-----------------------------
+        allPolicyWeight.append(policyWeight)
+        allMeanTimestep.append(len(newSample['samples'])/maxEpisode)
+        allDistance.append(distance)
+        allMeanReward.append(newSample['avgReward'])
+
+    saveExp(expName,allPolicyWeight,allMeanTimestep,allDistance,allMeanReward)
+    
+
+def LSPILamda(rewardFunction,expName,lamda,algo):
+    allPolicyWeight = []
+    allMeanTimestep = []
+    allDistance = []
+    allSamples = []
+    allMeanReward = []
+    
+    policyWeight = np.matrix(np.zeros((D,1))) #initial policy
+    allPolicyWeight.append(policyWeight)
+    distance = np.math.inf
+    iteration = 0
+    
     while iteration < maxIteration and distance > distanceThreshold:
         
-        obj = collectSamples(policyWeight) #optional
+        obj = collectSamples(policyWeight,rewardFunction) #optional
         samples = obj['samples']
         avgReward = obj['avgReward']
-        policyWeight = LSQ(samples, policyWeight)
+        policyWeight = algo(samples, policyWeight, lamda)
         distance = np.linalg.norm(policyWeight-allPolicyWeight[iteration])
         print(iteration,"average time steps :",len(samples)/maxEpisode,"distance",distance)
         iteration +=1
@@ -318,129 +481,93 @@ def LSPI():
         allDistance.append(distance)
         allMeanReward.append(avgReward)
     
-    print(policyWeight,len(collectSamples(policyWeight)['samples'])/maxEpisode)
-    
-    #expName = "reward 0 1"
-    #expName = "reward -1 1"
-    #expName = "reward -1 fx1"
-    #expName = "reward -1 fx2"
-    expName = "reward -1 fx2 6000 TimeStep"
-    #expName = "reward -1 0"
     saveExp(expName,allPolicyWeight,allMeanTimestep,allDistance,allMeanReward)
     
-#maxIteration = 100 #max itteration of LSPI if distance not less than predefine threshold
-#distanceThreshold = 0 #threshold to judge that policy is convert
-def LSPI2():
-    allPolicyWeight = []
-    allMeanTimestep = []
-    allDistance = []
-    allSamples = []
-    allMeanReward = []
+# def LSPILamda2(rewardFunction,expName,lamda):
+#     allPolicyWeight = []
+#     allMeanTimestep = []
+#     allDistance = []
+#     allSamples = []
+#     allMeanReward = []
+#     
+#     policyWeight = np.matrix(np.zeros((D,1))) #initial policy
+#     allPolicyWeight.append(policyWeight)
+#     
+#     distance = np.math.inf
+#     iteration = 0
+#     while iteration < maxIteration and distance > distanceThreshold:
+#         
+#         obj = collectSamples(policyWeight,rewardFunction) #optional
+#         samples = obj['samples']
+#         avgReward = obj['avgReward']
+#         policyWeight = SARSALamda(samples, policyWeight, lamda)
+#         distance = np.linalg.norm(policyWeight-allPolicyWeight[iteration])
+#         print(iteration,"average time steps :",len(samples)/maxEpisode,"distance",distance)
+#         iteration +=1
+#         
+#         #record-----------------------------
+#         allPolicyWeight.append(policyWeight)
+#         allMeanTimestep.append(len(samples)/maxEpisode)
+#         allDistance.append(distance)
+#         allMeanReward.append(avgReward)
+#     
+#     print(policyWeight,len(collectSamples(policyWeight,rewardFunction)['samples'])/maxEpisode)
+#     
+#     #expName = "reward -1 fx2 6000 TimeStep"
+#     saveExp(expName,allPolicyWeight,allMeanTimestep,allDistance,allMeanReward)
     
-    policyWeight = np.matrix(np.zeros((D,1))) #initial policy
-    allPolicyWeight.append(policyWeight)
-    distance = np.math.inf
-    
-    iteration = 0
-    samples = collectSamples(b1)['samples'] + collectSamples(b1)['samples'] + collectSamples(b1)['samples'] + collectSamples(b1)['samples'] + collectSamples(b2)['samples']
-    
-    while iteration < maxIteration and distance > distanceThreshold:
-        
-        obj = collectSamples(policyWeight) #optional
-        tempsamples = obj['samples']
-        avgReward = obj['avgReward']
-        policyWeight = LSQ(samples, policyWeight)
-        distance = np.linalg.norm(policyWeight-allPolicyWeight[iteration])
-        print(iteration,"average time steps :",len(tempsamples)/maxEpisode,"distance",distance)
-        iteration +=1
+# lamdaList = [0.0,.2,.4,.6,.8,1.0]
+# 
+# for lamda in lamdaList:
+#     expName = "reward -1 fx2 Lamda "+ str(lamda)+" SARSA"
+#     LSPILamda(rewardFunction2,expName,lamda)
+#     #LSPILamda(rewardFunctionMinus11,expName,lamda)
 
-        #record-----------------------------
-        allPolicyWeight.append(policyWeight)
-        allMeanTimestep.append(len(tempsamples)/maxEpisode)
-        allDistance.append(distance)
-        allMeanReward.append(avgReward)
-    
-    print(policyWeight,len(collectSamples(policyWeight)['samples'])/maxEpisode)
-    
-    #expName = "init sample b1 (reward -1 1)"
-    #expName = "init sample b2 (reward -1 1)"
-    #expName = "init sample b1 b2 (reward -1 1)"
-    
-    #expName = "init sample b1 (reward -1 fx2)"
-    #expName = "init sample b2 (reward -1 fx2)"
-    #expName = "init sample b1 b2 (reward -1 fx2)"
-    #expName = "init sample b1 b1 b1 b1 b2 (reward -1 fx2)"
-    expName = "test2"
-    saveExp(expName,allPolicyWeight,allMeanTimestep,allDistance,allMeanReward)
-    
-    
-#allPolicyWeight,allMeanTimestep,allDistance,allMeanReward = loadExp(expName) #for load option
+# lamda = 0.2
+# 
+# expName = "state 4D rewardFunction02 Lamda "+ str(lamda)
+# LSPILamda(rewardFunction2,expName,lamda)
 
-# expList = ["init sample b1 (reward -1 1)"]
-# expList.append("init sample b2 (reward -1 1)")
-# expList.append("init sample b1 b2 (reward -1 1)")
-# 
-# expList = ["init sample b1 (reward -1 fx2)"]
-# # expList.append("init sample b1 (reward -1 fx2)")
-# expList.append("init sample b2 (reward -1 fx2)")
-# expList.append("init sample b1 b2 (reward -1 fx2)")
+# [a,b,c,d] = loadExp("rewardFunction03 Lamda 0.2")
+# renderPolicy(a[150])
 
-# expList = ["reward 0 1"]
-# expList.append("reward -1 1")
-# expList.append("reward -1 fx1")
-# expList.append("reward -1 fx2")
-# 
-# expList = ["reward -1 fx2 6000 TimeStep"]
-# expList.append("reward -1 fx2")
-# 
-# 
-# plt.close()
-# 
-# plt.figure( figsize=(20, 9))
-# plt.ylim(0,6100)
-# for expName in expList:
-#     allPolicyWeight2,meanTimeStep,distance,allMeanReward = loadExp(expName) 
-#     plt.plot(meanTimeStep,label=expName,linewidth = 2 )#,linestyle = "dashed")#,color = "red")
-# plt.title("Experiment 3 and 2",loc = "center")
-# plt.grid('on')
-# 
-# lgd = plt.legend(bbox_to_anchor=(0.5,-.1), loc=9, borderaxespad=.1,ncol = 3)
-# for line in lgd.get_lines():
-#     line.set_linewidth(3)
-# plt.savefig(rootDir+'exp3and2.png',additional_artists = lgd,bbox_inches='tight')
-# 
-# plt.show()
-# 
-# 
-# policyWeight = allPolicyWeight[110]
-# s1 = renderPolicy(policyWeight)
-# 
-# policyWeight = allPolicyWeight[160]
-# s2 = renderPolicy(policyWeight)
-# 
-# reward = []
-# reward2 = []
-# n = len(s1)
+#LSPILamda(rewardFunction01,expName,lamda)
+
+# obj = collectSamples(b1,rewardFunction2)
+# #renderPolicy(b2,rewardFunction2)
+# s = obj['samples']
+# n = len(s)
+# min = np.inf
+# max = 0
 # for i in range(n):
-#     reward.append(s1[i].reward)
-#     
-# n = len(s2)
-# for i in range(n):    
-#     reward2.append(s2[i].reward)
-#     
-#     
-# policyWeight = allPolicyWeight[90]
-# s3 = renderPolicy(policyWeight)
-# 
-# policyWeight = allPolicyWeight2[90]
-# s4 = renderPolicy(policyWeight)
-# 
-# reward3 = []
-# reward4 = []
-# n = len(s3)
-# for i in range(n):
-#     reward3.append(s3[i].reward)
-#     
-# n = len(s4)
-# for i in range(n):    
-#     reward4.append(s4[i].reward)
+#     if s[i][0][3]< min:
+#         min = s[i][0][3]
+#     if s[i][0][3]> max:
+#         max = s[i][0][3]
+
+import pandas
+import matplotlib.pyplot as plt
+
+def getColorList(num):
+    color = ["red"]
+    color.append("blue")
+    color.append("green")
+    color.append("orange")
+    color.append("purple")
+    color.append("#00ff00")
+    color.append("#00ffff")
+    color.append("#ffffff")
+    color.append("#0000ff")
+    color.append("#ff00ff")
+    return color[0:num]
+    
+def getNEP(data,ep=50):
+    d = data
+    n = len(d['samples'])
+    c = 0
+    for i in range(n):
+        if(d['samples'][i].isAbsorb):
+            c = c+1
+        if(c == ep):
+            break
+    return {'samples':d['samples'][0:(i+1)],'avgReward':d['avgReward']}
