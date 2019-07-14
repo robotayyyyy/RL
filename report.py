@@ -16,67 +16,45 @@ def getExpSeriesName( expname):
 def report( expList, **args):
     prefix = ''
     label = 'NA'
+    cof = True
+    box = True
     
     if 'prefix' in args:
         prefix = args['prefix']
     if 'label' in args:
         label = args['label']
+    if 'cof' in args:
+        cof = args['cof']
+    if 'box' in args:
+        box = args['box']
         
-    data = [ f.loadExp(e) for e in expList ]
+    data = [ f.loadExp(e,cof = cof) for e in expList ]
     n = len(data)
     
     reward = [data[i]['reward'] for i in range(n)]
     distance = [data[i]['distance'] for i in range(n)]
     timeStep = [data[i]['timestep'] for i in range(n)]
     
+    p.plot(reward,label,fileName=prefix+'reward',labelY='Reward per decision')
+    p.plot(distance,label,fileName=prefix+'distance',labelY='distance')
+    #p.plot(distance,label,boxPlot = True, fileName=prefix+'distanceB')
+    p.plot(timeStep,label,fileName=prefix+'timeStep',labelY='Time step per episode')
     
-    p.plot(reward,label,fileName=prefix+'reward')
-    p.plot(reward,label,boxPlot = True, fileName=prefix+'rewardB')
+    if box:
+        p.plot(reward,label,boxPlot = True, fileName=prefix+'rewardB',labelY='Reward per decision')
+        p.plot(timeStep,label,boxPlot = True, fileName=prefix+'timeStepB',labelY='Time step per episode')
     
-    p.plot(distance,label,fileName=prefix+'distance')
-    p.plot(distance,label,boxPlot = True, fileName=prefix+'distanceB')
-    
-    p.plot(timeStep,label,fileName=prefix+'timeStep')
-    p.plot(timeStep,label,boxPlot = True, fileName=prefix+'timeStepB')
-    
-    
-    for key in data[0]['cof']:
-        #print(key)   
-        cofi = [ data[i]['cof'][key]  for i in range(n)]     
-        p.plot(cofi,key,fileName=prefix+" cof "+key)
-        p.plot(cofi,key,boxPlot = True, fileName=prefix+" cof "+key+'B')
-        
+    if cof:
+        for key in data[0]['cof']:
+            #print(key)   
+            cofi = [ data[i]['cof'][key]  for i in range(n)]     
+            p.plot(cofi,key,fileName=prefix+" cof "+key)
+            p.plot(cofi,key,boxPlot = True, fileName=prefix+" cof "+key+'B')
+            
         
 
 
 #expList= getExpSeriesName('LSTDQLamda rewardFunction2 D_8 ITE_200 EP_20 TS_6000 LD_0')
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -307,21 +285,21 @@ def report( expList, **args):
 #expName.append("init sample b1 (reward -1 fx2) FIX 6k")
 #
 #
-#expName = ["init sample br (reward -1 fx2) NONFIX 6k"]
-#expName.append("init sample br (reward -1 fx2) FIX 6k")
-#
-#expLabel = expName #by default
-#expLabel = ["Updated sample"]
-#expLabel.append("Fixed sample")
-#
-##expIndex = pandas.DataFrame({"expName":expName,"expLabel":expLabel,"color":getColorList(2)})
-#expIndex = pandas.DataFrame({"expName":expName,"expLabel":expLabel,"color":['blue','orange']})
-#
-#plt.close()
-#plt.rcParams.update({'font.size': 20})
-#plt.figure( figsize=(10, 7))
-#plt.ylim(0,6100)
-#for index,row in expIndex.iterrows():
+# expName = ["init sample br (reward -1 fx2) NONFIX 6k"]
+# expName.append("init sample br (reward -1 fx2) FIX 6k")
+# 
+# expLabel = expName #by default
+# expLabel = ["Updated sample"]
+# expLabel.append("Fixed sample")
+# 
+#expIndex = pandas.DataFrame({"expName":expName,"expLabel":expLabel,"color":getColorList(2)})
+# expIndex = pandas.DataFrame({"expName":expName,"expLabel":expLabel,"color":['blue','orange']})
+# 
+# plt.close()
+# plt.rcParams.update({'font.size': 20})
+# plt.figure( figsize=(10, 7))
+# plt.ylim(0,6100)
+# for index,row in expIndex.iterrows():
 #    allPolicyWeight2,meanTimeStep,distance,allMeanReward = loadExp(row.expName) 
 #    meanTimeStep[0] = meanTimeStep[1] 
 #    if index == 0 :
@@ -330,14 +308,14 @@ def report( expList, **args):
 #        meanTimeStep[145]=6000
 #    plt.plot(meanTimeStep,label=row.expLabel,linewidth = 2 ,color = row.color)
 #    #plt.semilogy(meanTimeStep,linewidth = 2 ,color = row.color)
-#plt.grid('on')
-#
-#lgd = plt.legend(loc =10 ,bbox_to_anchor=(1.1, 0.5) ,ncol = 1, mode="none",fontsize = 'small')
-#plt.xlabel("iteration")
-#plt.ylabel("Average timestep")
-#
-#plt.savefig(rootDir+'expT01.png',additional_artists = (lgd,), bbox_inches='tight')
-#plt.show()
+# plt.grid('on')
+# 
+# lgd = plt.legend(loc =10 ,bbox_to_anchor=(1.1, 0.5) ,ncol = 1, mode="none",fontsize = 'small')
+# plt.xlabel("iteration")
+# plt.ylabel("Average timestep")
+# 
+# plt.savefig(rootDir+'expT01.png',additional_artists = (lgd,), bbox_inches='tight')
+# plt.show()
 #
 #
 #plt.close()

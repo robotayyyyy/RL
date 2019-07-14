@@ -1,6 +1,37 @@
 import numpy as np
 import param
 
+class FSimpleState:
+    def __init__(self):
+
+        basisSimpleD = 12
+        self.dimension = basisSimpleD
+        #dummy weight for testing
+        self.dummyWeight = np.matrix( np.random.rand(self.dimension).reshape(self.dimension,1)-0.5)
+        
+    def basis(self,state, action): #best
+        D = self.dimension
+        phi = np.zeros((D,1))
+        if(action == 0):
+            
+            phi[0,0]= state[0]
+            phi[1,0]= state[1]
+            phi[2,0]= state[2]
+            phi[3,0]= state[3]
+            phi[4,0]= state[4]
+            phi[5,0]= state[5]
+
+        else:
+            phi[6,0]= state[0]
+            phi[7,0]= state[1]
+            phi[8,0]= state[2]
+            phi[9,0]= state[3]
+            phi[10,0]= state[4]
+            phi[11,0]= state[5]
+
+        return(phi)
+        
+        
 class CartPoleSimpleState:
     def __init__(self):
         self.__param = param.CartPoleParam()

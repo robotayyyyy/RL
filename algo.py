@@ -1,4 +1,4 @@
-import gym
+import gym, fenv
 import fileRecord
 import numpy as np
 from collections import namedtuple
@@ -20,6 +20,7 @@ class RL:
         self.__episode = p.maxEpisode
         self.__iteration = p.maxIteration
         self.__explorationRate = p.explorationRate
+        #self.__explorationRate = 1.0
         self.__distanceThreshold = p.distanceThreshold
         self.__discountFactor = p.discountFactor
         self.__p = p
@@ -31,8 +32,11 @@ class RL:
         
         self.validateInput(args)
         
-        self.__env = gym.make(self.__envInput)
-        self.__env._max_episode_steps = 50000 #set max of timestep as big number
+        if self.__envInput == 'CartPole-v0':
+            self.__env = gym.make(self.__envInput)
+            self.__env._max_episode_steps = 50000 #set max of timestep as big number
+        else:
+            self.__env = fenv.fenv()
 
 #        print(self.expName)
         
@@ -73,12 +77,17 @@ class RL:
             
         if 'expName' in args:
             self.expName = args['expName']       
-        
+    def appendDict(self,d1,d2):
+        newD = dict()
+        for k in d1.keys():
+            newD[k] = d1[k]+d2[k]
+        return newD    
     def policyFunction(self,policyWeight, state):#get the action that maximize utility(value function) for given state
 
         if np.random.random() < self.__explorationRate:#random an action
             selectedAction = not np.random.randint(self.__possibleAction) #random range [0,possibleAction)
         else:#get the best action
+
             temp = [float(np.transpose(policyWeight) * self.__basis(state,a)) for a in range(self.__possibleAction)]
             selectedAction = np.argmax(temp)
             
@@ -96,7 +105,7 @@ class RL:
                 #action = int(np.round( random.random())) #pure random
                 nextState, reward, isAbsorb, info = self.__env.step(action) #do action
                 
-                reward = self.__reward(nextState,isAbsorb)
+                reward = self.__reward(nextState, reward, isAbsorb, info)
                 
                 #record
                 samples.append( mySample(state,action,reward,nextState,isAbsorb) )
@@ -114,17 +123,18 @@ class RL:
         return(  {'samples':samples,'avgReward':np.average(accReward), 'cof':self.__p.causeOfFailureSummary(cof) }  )
         
     def renderPolicy(self,policyWeight ):
+        #self.__explorationRate = 0
         samples = []
         sumreward = []
         state = self.__env.reset() #reset simulation to start position
-        
+        print(state)
         for j in range(self.__timestep):
             self.__env.render()
             action = self.policyFunction(policyWeight, state)
             #action = int(np.round( random.random())) #pure random policy
             nextState, reward, isAbsorb, info = self.__env.step(action) #do action
             
-            reward = self.__reward(nextState,isAbsorb)
+            reward = self.__reward(nextState, reward, isAbsorb, info)
             
             #record
             samples.append( mySample(state,action,reward,nextState,isAbsorb) )
@@ -137,10 +147,11 @@ class RL:
         
         print('timestep : ',j+1)
         input('press any key to exit : ')
-        self.__env.render(close=True)
+        self.__env.close()
         return(  {'samples':samples,'avgReward':np.average(sumreward)}  )
     
     def execute(self):
+        self.__explorationRate = 1.0
         self.LSPI(self.__algo)
         
     def LSPI(self,algo,**args):
@@ -166,11 +177,14 @@ class RL:
         allMeanTimestep.append(len(samples['samples'])/self.__episode)
         allMeanReward.append(samples['avgReward'])
         allDistance.append(np.nan)
-        cof = samples['cof']
+        cof = samples['cof'] #pass by ref
         iteration = 0
         while iteration < self.__iteration and distance > self.__distanceThreshold:
+        #while iteration < self.__iteration:
             if not fix and newSample != False: #in case not fix sample and there are newSample
                 samples = newSample
+                #samples['cof'] = newSample['cof']
+                #samples['samples'] += newSample['samples']
             
             print("input---------",len(samples['samples'])/self.__episode,"--------------")
             
@@ -180,9 +194,10 @@ class RL:
             distance = np.linalg.norm(newPolicyWeight-allPolicyWeight[iteration])
             newSample = self.collectSamples(newPolicyWeight) #for measure performance
             policyWeight = newPolicyWeight
-            print(iteration,"average time steps :",len(newSample['samples'])/self.__episode,"distance",distance)
-            
+            print(iteration,"average time steps :",len(newSample['samples'])/self.__episode," distance:",distance," explo.Rate",self.__explorationRate)
+            #print("******",self.__explorationRate)
             iteration +=1
+            self.__explorationRate *= 0.5
             
             #record-----------------------------
             allPolicyWeight.append(newPolicyWeight)
@@ -191,23 +206,44 @@ class RL:
             allMeanReward.append(newSample['avgReward'])
             for key in cof:
                 cof[key] += newSample['cof'][key]
-        fileRecord.ExpSaveLoad().saveExp(self.expName,[0,1,1,1,1],allPolicyWeight=allPolicyWeight, allMeanTimestep=allMeanTimestep, allDistance=allDistance, allMeanReward=allMeanReward,cof=cof)
+        fileRecord.ExpSaveLoad().saveExp(self.expName,[0,1,1,1,1],['average timestep','distance','average reward','percent'],allPolicyWeight=allPolicyWeight, allMeanTimestep=allMeanTimestep, allDistance=allDistance, allMeanReward=allMeanReward,cof=cof)
     
     def LSTDQLamda(self,samples, policyWeight,lambdaV):
         A = np.matrix(np.zeros((self.__D,self.__D)))
+        #np.fill_diagonal(A, policyWeight)
+        
         B = np.matrix(np.zeros((self.__D,1)))
         n = len(samples)
         z = np.zeros((self.__D,1))
-        for i in range(n): #start from i=0 to i=n-1
-            phi = self.__basis(samples[i].state,samples[i].action)
-            z = (lambdaV)*z + phi
-            if samples[i].isAbsorb != True: #check if next state is not absorb state
-                nextAction = self.policyFunction(policyWeight, samples[i].nextState)
-                nextPhi = self.__basis(samples[i].nextState, nextAction)
-            else:
-                nextPhi = np.zeros((self.__D,1))
-            
-            A = A + z * np.transpose(phi - self.__discountFactor*nextPhi)
-            B = B + z * samples[i].reward
         
-        return(np.linalg.pinv(A)*B)    
+        epoch = 1
+        threshold = 0.01
+        oldNorm = np.linalg.pinv(A)*B*0
+        newNorm = np.linalg.pinv(A)*B*0
+        
+        for j in range(epoch):
+            for i in range(n): #start from i=0 to i=n-1
+                phi = self.__basis(samples[i].state,samples[i].action)
+                z = (lambdaV)*z + phi
+                if samples[i].isAbsorb != True: #check if next state is not absorb state
+                    nextAction = self.policyFunction(policyWeight, samples[i].nextState)
+                    nextPhi = self.__basis(samples[i].nextState, nextAction)
+                else:
+                    nextPhi = np.zeros((self.__D,1)) #+ samples[i].reward
+                
+                A = A + z * np.transpose(phi - self.__discountFactor*nextPhi)
+                B = B + z * samples[i].reward
+                
+            x = np.linalg.pinv(A)*B
+            newNorm = x / np.linalg.norm(x)
+            if np.linalg.norm(newNorm-oldNorm)<threshold:
+                print("break!------",j) 
+                break
+            oldNorm = newNorm
+        #return(np.linalg.pinv(A)*B)   
+        # print("A ",A)
+        # print("B ",B)
+        # print("x ",x)
+        # print("n ",n)
+        # print("reward ",[samples[i].reward for i in range(n)] )
+        return(newNorm)

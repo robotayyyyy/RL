@@ -17,7 +17,7 @@ class ExpSaveLoad:
         with open(filename, 'wb') as fp:
             pickle.dump(var, fp)   
 
-    def saveExp(self,expName,plotList, **args):
+    def saveExp(self,expName,plotList,labelList, **args):
         outputDir = self.__rootDir+expName+"/"
         print(outputDir)
         if not os.path.exists(outputDir):
@@ -30,19 +30,19 @@ class ExpSaveLoad:
                 if(plotList.pop(0) == 1):#pop first element then plot
                     subKey = [i for i in args[key]] #subKey is label for now
                     data = [args[key][i] for i in args[key]]
-                    plot.expPlot().plot(data, subKey, fileName = key, rootDir = outputDir)
+                    plot.expPlot().plot(data, subKey, fileName = key, rootDir = outputDir, labelY=labelList.pop(0))
 #                for subKey in args[key]:#save each series as 1 file
 #                    self.saveFile(outputDir+subKey,args[key][subKey])    
             else:                    
                 self.saveFile(outputDir+key,args[key])
                 if(plotList.pop(0) == 1):#pop first element then plot
-                    plot.expPlot().plot([args[key]], [key], fileName = key, rootDir =outputDir)
+                    plot.expPlot().plot([args[key]], [key], fileName = key, rootDir =outputDir, labelY=labelList.pop(0))
 
     def loadFile(self,filename):        
         with open (filename, 'rb') as fp:
             return(pickle.load(fp))
             
-    def loadExp(self,expName):#not perfect but robust
+    def loadExp(self,expName,**args):#not perfect but robust
         outputDir = self.__rootDir+expName+"\\"
         if not os.path.exists(outputDir):
             print("error path not exist")
@@ -56,12 +56,17 @@ class ExpSaveLoad:
         allMeanTimestep = self.loadFile(self.__rootDir+expName+"\\allMeanTimestep")
         allDistance = self.loadFile(self.__rootDir+expName+"\\allDistance")
         allMeanReward = self.loadFile(self.__rootDir+expName+"\\allMeanReward")
-        cof = self.loadFile(self.__rootDir+expName+"\\cof")
+        if args['cof']:
+            cof = self.loadFile(self.__rootDir+expName+"\\cof")
 #        cof['Out of track'] = self.loadFile(self.__rootDir+expName+"\\Out of track")
 #        cof['Pole down'] = self.loadFile(self.__rootDir+expName+"\\Pole down")
 #        cof['Time'] = self.loadFile(self.__rootDir+expName+"\\Time")
 #        
-        return {'weight':allPolicyWeight,'timestep':allMeanTimestep,'distance':allDistance,'reward':allMeanReward,'cof':cof}
+            
+        if args['cof']:
+            return {'weight':allPolicyWeight,'timestep':allMeanTimestep,'distance':allDistance,'reward':allMeanReward,'cof':cof}
+        else:
+            return {'weight':allPolicyWeight,'timestep':allMeanTimestep,'distance':allDistance,'reward':allMeanReward}
     
 
 
