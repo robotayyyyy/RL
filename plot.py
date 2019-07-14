@@ -13,7 +13,34 @@ class expPlot:
         color.append("purple")
         color.append("#00ff00")
         color.append("#00ffff")
-        color.append("#ffffff")
+        color.append("#555555")
+        color.append("#0000ff")
+        color.append("#ff00ff")
+        color.append("blue")
+        color.append("green")
+        color.append("orange")
+        color.append("purple")
+        color.append("#00ff00")
+        color.append("#00ffff")
+        color.append("#555555")
+        color.append("#0000ff")
+        color.append("#ff00ff")
+        color.append("blue")
+        color.append("green")
+        color.append("orange")
+        color.append("purple")
+        color.append("#00ff00")
+        color.append("#00ffff")
+        color.append("#555555")
+        color.append("#0000ff")
+        color.append("#ff00ff")
+        color.append("blue")
+        color.append("green")
+        color.append("orange")
+        color.append("purple")
+        color.append("#00ff00")
+        color.append("#00ffff")
+        color.append("#555555")
         color.append("#0000ff")
         color.append("#ff00ff")
         return color[0:num]
@@ -86,12 +113,18 @@ class expPlot:
         
         if boxPlot:
             tdata = list(np.array(np.matrix.transpose(np.matrix(data))) )
-            plt.plot([np.nan]+[np.mean(tdata[i]) for i in range(len(tdata))],label = 'mean')
-            plt.plot([np.nan]+[np.max(tdata[i]) for i in range(len(tdata))],label = 'max')
-            plt.plot([np.nan]+[np.min(tdata[i]) for i in range(len(tdata))],label = 'min')
-            plt.plot([np.nan]+[np.percentile(tdata[i],25) for i in range(len(tdata))],label = 'Q1')
-            plt.plot([np.nan]+[np.percentile(tdata[i],50) for i in range(len(tdata))],label = 'Q2')
-            plt.plot([np.nan]+[np.percentile(tdata[i],75) for i in range(len(tdata))],label = 'Q3')
+            plt.plot([np.nan]+[np.mean(tdata[i]) for i in range(len(tdata))],color = 'red',linewidth = 2.0)
+           
+            #plt.plot([np.nan]+[np.max(tdata[i]) for i in range(len(tdata))],label = 'max')
+            #plt.plot([np.nan]+[np.min(tdata[i]) for i in range(len(tdata))],label = 'min')
+            #plt.plot([np.nan]+[np.percentile(tdata[i],25) for i in range(len(tdata))],label = 'Q1')
+            #plt.plot([np.nan]+[np.percentile(tdata[i],50) for i in range(len(tdata))],label = 'Q2')
+            #plt.plot([np.nan]+[np.percentile(tdata[i],75) for i in range(len(tdata))],label = 'Q3')
+            
+            Q1 = [np.nan]+[np.percentile(tdata[i],25) for i in range(len(tdata))]
+            Q3 = [np.nan]+[np.percentile(tdata[i],75) for i in range(len(tdata))]
+            plt.fill_between( [x for x in range(len(Q1))],Q1, Q3, color = 'bisque')
+            #plt.show()
             #plt.boxplot(tdata)
         else:
             for index,row in expIndex.iterrows():
@@ -107,5 +140,5 @@ class expPlot:
             plt.title(title)
         
         plt.savefig(rootDir+fileName+'.png',additional_artists = (lgd,), bbox_inches='tight')
-        plt.show()
+        #plt.show()
         
